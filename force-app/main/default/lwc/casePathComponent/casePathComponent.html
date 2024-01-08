@@ -1,0 +1,17 @@
+<!--
+  @description       : 
+  @author            : Vinay Sriram
+  @group             : 
+  @last modified on  : 06-04-2023
+  @last modified by  : Vinay Sriram
+-->
+<template>
+  <div style="pointer-events: fill">
+    <lightning-progress-indicator current-step={currentstatus} type="path" variant="base">
+      <template for:each={pickListOptions} for:item="step">
+        <lightning-progress-step label={step.label} value={step.value} key={step.label}></lightning-progress-step>
+      </template>
+    </lightning-progress-indicator>
+  </div>
+  <c-cometdlwc channel={channelName} onmessage={messageReceived}></c-cometdlwc>
+</template>
