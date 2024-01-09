@@ -1,6 +1,6 @@
-name: Production Pipeline
+name: dev Pipeline
 on:
-  pull_request:
+  push:
     types: [closed]
     branches:
       - dev
