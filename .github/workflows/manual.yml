@@ -1,7 +1,6 @@
 name: dev Pipeline
 on:
   push:
-    types: [closed]
     branches:
       - dev
     paths:
