@@ -34,6 +34,9 @@ jobs:
         run: |
           # Authenticate with the Salesforce Dev Org using JWT
           echo "Authenticating with Salesforce..."
+          echo ${{ secrets.SALESFORCEPRODCLIENTID }}
+          echo ${{ secrets.SALESFORCEPRODUSERNAME }}
+          echo ${{ secrets.SALESFORCEPRODINSTANCEURL }}
           sf login org jwt --username $USERNAME --client-id $CLIENT_ID --jwt-key-file ./assets/server.key --instance-url $INSTANCE_URL
           
       - name: Validate and Deploy Salesforce Project
