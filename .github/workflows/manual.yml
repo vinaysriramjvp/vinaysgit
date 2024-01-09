@@ -1,51 +1,41 @@
-# This is a basic workflow to help you get started with Actions
-
-name: Deploy to Salesforce Pipeline
-
-# Controls when the action will run. Triggers the workflow on push or pull request
-# events but only for the master branch
+[5:56 pm, 09/01/2024] Vinay sriram Jujjavarapu: https://abhisheksubbu.github.io/salesforce-github-devops/
+[6:29 pm, 09/01/2024] Vinay sriram Jujjavarapu: name: Deploy Manifest Package to Salesforce
+ 
+# Triggers the workflow on push or pull request events but only for the master branch
 on:
-  push:
-    branches: [ dev ]
-  pull_request:
-    branches: [ dev ]
-
-# A workflow run is made up of one or more jobs that can run sequentially or in parallel
+  push:
+    branches: [ dev ]
+  pull_request:
+    branches: [ dev ]
+ 
 jobs:
-  # This workflow contains a single job called "build"
-  build:
-    # The type of runner that the job will run on
-    runs-on: ubuntu-latest
-
-    # Steps represent a sequence of tasks that will be executed as part of the job
-    steps:
-    # Checks-out your repository under $GITHUB_WORKSPACE, so your job can access it
-    - uses: actions/checkout@v2
-
-    # Setup Node
-    - name: Setup Node
-      uses: actions/setup-node@v1
-    
-    # Install SFDX CLI
-    - name: Install SFDX CLI
-      run: npm install sfdx-cli --global
-
-    # Authorize SF Org
-    - name: Authorize SF Org
-      env:
-        CLIENT_ID: ${{ secrets.SALESFORCEPRODCLIENTID }}
-        USERNAME: ${{ secrets.SALESFORCEPRODUSERNAME }}
-        INSTANCE_URL: ${{ secrets.SALESFORCEPRODINSTANCEURL }}
-      run: sfdx force:auth:jwt:grant --clientid $CLIENT_ID --jwtkeyfile ./buildfiles/server.key --username $USERNAME --instanceurl $INSTANCE_URL -a prod
-
-    # Convert to Deploy Source
-    - name: Convert to Deploy Source
-      run: sfdx force:source:convert -r ./force-app -d ./toDeploy
-    
-    # Run Validation of Deploy Source
-    - name: Run Validation on Deploy Source
-      run: sfdx force:mdapi:deploy -l RunLocalTests -c -d ./toDeploy -u prod -w 10
-    
-    # Deploy
-    - name : Deploy to SF Org
-      run: sfdx force:mdapi:deploy -l RunLocalTests -d ./toDeploy -u prod -w 10
+  deploy:
+    runs-on: ubuntu-latest
+ 
+    steps:
+    # Checkout the repository code
+    - uses: actions/checkout@v2
+ 
+    # Setup Node.js
+    - name: Setup Node
+      uses: actions/setup-node@v1
+    
+    # Install Salesforce DX CLI
+    - name: Install SFDX CLI
+      run: npm install sfdx-cli --global
+ 
+    # Authorize Salesforce Org
+    - name: Authorize SF Org
+      env:
+        CLIENT_ID: ${{ secrets.SALESFORCEPRODCLIENTID }}
+        USERNAME: ${{ secrets.SALESFORCEPRODUSERNAME }}
+        INSTANCE_URL: ${{ secrets.SALESFORCEPRODINSTANCEURL }}
+      run: sfdx force:auth:jwt:grant --clientid $CLIENT_ID --jwtkeyfile ./buildfiles/server.key --username $USERNAME --instanceurl $INSTANCE_URL -a prod
+ 
+    # Run Validation of Manifest Package
+    - name: Run Validation on Manifest Package
+      run: sfdx force:mdapi:deploy -l RunLocalTests -c -d ./manifestPackage -u prod -w 10
+    
+    # Deploy Manifest Package
+    - name: Deploy Manifest Package to SF Org
+      run: sfdx force:mdapi:deploy -l RunLocalTests -d ./manifestPackage -u prod -w 10
