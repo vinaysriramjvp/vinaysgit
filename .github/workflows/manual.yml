@@ -1,59 +1,93 @@
-name: Production Pipeline
+name: Salesforce Deployment
 on:
-  pull_request:
-    types: [closed]
+  push:
     branches:
-      - dev
-    paths:
-      - 'force-app/**'
+      - master
+
+env:
+  SF_AUTOUPDATE_DISABLE: true
+  SF_USE_GENERIC_UNIX_KEYCHAIN: true
 
 jobs:
-  Explore-GitHub-Actions:
+  Salesforce_Deployment:
     runs-on: ubuntu-latest
-    name: ${{ github.actor }} is running pipeline on ${{ github.repository }}
+    timeout-minutes: 200
     steps:
-      - name: Display GitHub Event
-        run: echo "🎉 The job was automatically triggered by a ${{ github.event_name }} event."
-      - name: Display Runner OS
-        run: echo "🐧 This job is now running on a ${{ runner.os }} server hosted by GitHub!"
-      - name: Display Branch and Repository Info
-        run: echo "🔎 The name of your branch is ${{ github.ref }} and your repository is ${{ github.repository }}."
-      - name: Check out repository code
+      - name: Checkout Code
         uses: actions/checkout@v3
-      - name: Clone Repository Info
-        run: echo "💡 The ${{ github.repository }} repository has been cloned to the runner."
-      - name: Prepare to Test Code
-        run: echo "🖥️ The workflow is now ready to test your code on the runner."
-      - name: List files in the repository
-        run: ls ${{ github.workspace }}
-      - name: Display Job Status
-        run: echo "🍏 This job's status is ${{ job.status }}."
+      
+      - name: Install Salesforce CLI
+        run: |
+          echo "Installing Salesforce CLI..."
+          npm install -g @salesforce/cli
 
-  build:
-    runs-on: ubuntu-latest
-    environment: dev
-    steps:
-      - name: Checkout the Source code from the latest commit
-        uses: actions/checkout@v3
-      - name: Install NPM
-        run: npm install
-      - name: Install the SFDX CLI
+      - name: Validate and Deploy Salesforce Project
         run: |
-          npm install sfdx-cli --global
-          sfdx force --help
-      - name: Install the sfdx-git-delta plugin
-        run: echo 'y' | sfdx plugins:install sfdx-git-delta
-      - name: Authorize SF Org
-        env:
-          CLIENT_ID: ${{ secrets.SALESFORCEPRODCLIENTID }}
-          USERNAME: ${{ secrets.SALESFORCEPRODUSERNAME }}
-          INSTANCE_URL: ${{ secrets.SALESFORCEPRODINSTANCEURL }}
-        run: sfdx force:auth:jwt:grant --clientid $CLIENT_ID --jwtkeyfile ./assets/server.key --username $USERNAME --instanceurl $INSTANCE_URL -a prod
-      - name: Generate the package.xml for delta files
-        run: |
-          mkdir delta
-          sfdx sgd:source:delta --to "HEAD" --from "HEAD~1" --output "./delta" --ignore-whitespace -d -i .sgdignore
-          echo "--- package.xml generated with added and modified metadata ---"
-          cat delta/package/package.xml
-      - name: Deploy Delta components to Salesforce
-        run: sfdx force:source:deploy -x delta/package/package.xml -c -l RunLocalTests -u HubOrg
+          # Grant all permissions to the jq tool for JSON parsing
+          chmod 777 ./jq
+          echo "Installation complete."
+
+          # Authenticate with the Salesforce Dev Org using JWT
+          echo "Authenticating with Salesforce..."
+          sf login org jwt --username ${{ secrets.SALESFORCEPRODUSERNAME }} --client-id ${{ secrets.SALESFORCEPRODCLIENTID }} --jwt-key-file ./assets/server.key --instance-url ${{ secrets.SALESFORCEPRODINSTANCEURL }}
+
+          # Validate the Salesforce project using the manifest/package.xml
+          echo "Starting Salesforce project validation..."
+          validationResult=$(sf deploy metadata validate --manifest ./manifest/package.xml --target-org ${{ secrets.SALESFORCEPRODUSERNAME }} --json)
+          echo "Raw Validation Result:"
+          echo $validationResult | jq '.'  # Pretty print the JSON
+
+          jobId=$(echo $validationResult | ./jq -r ".result.id")
+
+          # If jobId is null or empty, print raw output for debugging
+          if [ -z "$jobId" ]; then
+              echo "Unexpected result from validation initiation."
+              exit 1
+          fi
+
+          # Monitor the validation status until it's complete
+          isComplete="false"
+          while [ "$isComplete" == "false" ]; do
+              sleep 10
+              statusResult=$(sf deploy metadata report --job-id $jobId --json)
+              isComplete=$(echo $statusResult | ./jq -r ".result.done")
+              status=$(echo $statusResult | ./jq -r ".result.status")
+              echo "Validation Status: $status"
+              
+              # Check if status is null and break out of the loop
+              if [ "$status" == "null" ]; then
+                  echo "Error: Unexpected null status from Salesforce CLI."
+                  echo "Full Status Result:"
+                  echo $statusResult | jq '.'
+                  exit 1
+              fi
+          done
+
+          # Handle different validation statuses and display detailed error messages
+          if [ "$status" != "Succeeded" ]; then
+              echo "Error: Validation failed with status: $status"
+              echo "Detailed Error:"
+              echo $statusResult | ./jq -r ".result.details.componentFailures" | jq '.'  # Pretty print the JSON
+              exit 1
+          fi
+
+          # Proceed with deployment
+          echo "Deploying Salesforce project..."
+          deploymentResult=$(sf deploy metadata --manifest ./manifest/package.xml --target-org ${{ secrets.SALESFORCEPRODUSERNAME }} --json)
+          deploymentStatus=$(echo $deploymentResult | ./jq -r ".result.status")
+
+          if [ "$deploymentStatus" == "null" ]; then
+              echo "Error: Unexpected null status from Salesforce CLI during deployment."
+              echo "Full Deployment Result:"
+              echo $deploymentResult | jq '.'
+              exit 1
+          elif [ "$deploymentStatus" != "Succeeded" ]; then
+              echo "Error: Deployment failed with status: $deploymentStatus"
+              echo "Detailed Error:"
+              echo $deploymentResult | ./jq -r ".result.details.componentFailures" | jq '.'  # Pretty print the JSON
+              exit 1
+          fi
+
+          echo "Deployment Status: $deploymentStatus"
+          echo "Deployment complete."
+        displayName: "Step: Validate and Deploy Salesforce Project"
