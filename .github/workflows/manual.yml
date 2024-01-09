@@ -56,7 +56,7 @@ jobs:
            INSTANCE_URL: ${{ secrets.SALESFORCEPRODINSTANCEURL }}
       - name: Authenticate Salesforce ORG
         run: |
-           run: sfdx force:auth:jwt:grant --clientid $CLIENT_ID --jwtkeyfile ./buildfiles/server.key --username $USERNAME --instanceurl $INSTANCE_URL -a prod
+           run: sfdx force:auth:jwt:grant --clientid $CLIENT_ID --jwtkeyfile ./assets/server.key --username $USERNAME --instanceurl $INSTANCE_URL -a prod
       
       - name: Generate the package.xml for delta files
         run: |
