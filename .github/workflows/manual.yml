@@ -11,6 +11,7 @@ env:
 jobs:
   Salesforce_Deployment:
     runs-on: ubuntu-latest
+    environment: dev
     timeout-minutes: 200
     steps:
       - name: Checkout Code
@@ -19,7 +20,7 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@v2
         with:
-          node-version: '16' # Update Node.js to version 16
+          node-version: '16' # Ensure compatible Node.js version
 
       - name: Install Salesforce CLI
         run: |
@@ -27,35 +28,23 @@ jobs:
           npm install -g @salesforce/cli
 
       - name: Authorize SF Org
-        env:
-          CLIENT_ID: ${{ secrets.SALESFORCEPRODCLIENTID }}
-          USERNAME: ${{ secrets.SALESFORCEPRODUSERNAME }}
-          INSTANCE_URL: ${{ secrets.SALESFORCEPRODINSTANCEURL }}
         run: |
-          # Authenticate with the Salesforce Dev Org using JWT
           echo "Authenticating with Salesforce..."
-          echo ${{ secrets.SALESFORCEPRODCLIENTID }}
-          echo ${{ secrets.SALESFORCEPRODUSERNAME }}
-          echo ${{ secrets.SALESFORCEPRODINSTANCEURL }}
-          sf login org jwt --username $USERNAME --client-id $CLIENT_ID --jwt-key-file ./assets/server.key --instance-url $INSTANCE_URL
-          
+          sf login org jwt --username "${{ secrets.SALESFORCEPRODUSERNAME }}" --client-id "${{ secrets.SALESFORCEPRODCLIENTID }}" --jwt-key-file ./assets/server.key --instance-url "${{ secrets.SALESFORCEPRODINSTANCEURL }}"
+
       - name: Validate and Deploy Salesforce Project
         run: |
-          # Validate the Salesforce project using the manifest/package.xml
           echo "Starting Salesforce project validation..."
-          validationResult=$(sf deploy metadata validate --manifest ./manifest/package.xml --target-org $USERNAME --json)
+          validationResult=$(sf deploy metadata validate --manifest ./manifest/package.xml --target-org "${{ secrets.SALESFORCEPRODUSERNAME }}" --json)
           echo "Raw Validation Result:"
           echo $validationResult | jq '.'  # Pretty print the JSON
 
           jobId=$(echo $validationResult | jq -r ".result.id")
-
-          # If jobId is null or empty, print raw output for debugging
           if [ -z "$jobId" ]; then
               echo "Unexpected result from validation initiation."
               exit 1
           fi
 
-          # Monitor the validation status until it's complete
           isComplete="false"
           while [ "$isComplete" == "false" ]; do
               sleep 10
@@ -64,37 +53,30 @@ jobs:
               status=$(echo $statusResult | jq -r ".result.status")
               echo "Validation Status: $status"
               
-              # Check if status is null and break out of the loop
               if [ "$status" == "null" ]; then
                   echo "Error: Unexpected null status from Salesforce CLI."
-                  echo "Full Status Result:"
                   echo $statusResult | jq '.'
                   exit 1
               fi
           done
 
-          # Handle different validation statuses and display detailed error messages
           if [ "$status" != "Succeeded" ]; then
               echo "Error: Validation failed with status: $status"
-              echo "Detailed Error:"
-              echo $statusResult | jq -r ".result.details.componentFailures" | jq '.'  # Pretty print the JSON
+              echo $statusResult | jq -r ".result.details.componentFailures" | jq '.'
               exit 1
           fi
 
-          # Proceed with deployment
           echo "Deploying Salesforce project..."
-          deploymentResult=$(sf deploy metadata --manifest ./manifest/package.xml --target-org $USERNAME --json)
+          deploymentResult=$(sf deploy metadata --manifest ./manifest/package.xml --target-org "${{ secrets.SALESFORCEPRODUSERNAME }}" --json)
           deploymentStatus=$(echo $deploymentResult | jq -r ".result.status")
 
           if [ "$deploymentStatus" == "null" ]; then
               echo "Error: Unexpected null status from Salesforce CLI during deployment."
-              echo "Full Deployment Result:"
               echo $deploymentResult | jq '.'
               exit 1
           elif [ "$deploymentStatus" != "Succeeded" ]; then
               echo "Error: Deployment failed with status: $deploymentStatus"
-              echo "Detailed Error:"
-              echo $deploymentResult | jq -r ".result.details.componentFailures" | jq '.'  # Pretty print the JSON
+              echo $deploymentResult | jq -r ".result.details.componentFailures" | jq '.'
               exit 1
           fi
 
