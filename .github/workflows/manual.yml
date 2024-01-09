@@ -1,27 +1,59 @@
- # Setup Node
-    - name: Setup Node
-      uses: actions/setup-node@v1
-    
-    # Install SFDX CLI
-    - name: Install SFDX CLI
-      run: npm install sfdx-cli --global
+name: Production Pipeline
+on:
+  pull_request:
+    types: [closed]
+    branches:
+      - dev
+    paths:
+      - 'force-app/**'
 
-    # Authorize SF Org
-    - name: Authorize SF Org
-      env:
-        CLIENT_ID: ${{ secrets.SALESFORCEPRODCLIENTID }}
-        USERNAME: ${{ secrets.SALESFORCEPRODUSERNAME }}
-        INSTANCE_URL: ${{ secrets.SALESFORCEPRODINSTANCEURL }}
-      run: sfdx force:auth:jwt:grant --clientid $CLIENT_ID --jwtkeyfile ./buildfiles/server.key --username $USERNAME --instanceurl $INSTANCE_URL -a prod
+jobs:
+  Explore-GitHub-Actions:
+    runs-on: ubuntu-latest
+    name: ${{ github.actor }} is running pipeline on ${{ github.repository }}
+    steps:
+      - name: Display GitHub Event
+        run: echo "🎉 The job was automatically triggered by a ${{ github.event_name }} event."
+      - name: Display Runner OS
+        run: echo "🐧 This job is now running on a ${{ runner.os }} server hosted by GitHub!"
+      - name: Display Branch and Repository Info
+        run: echo "🔎 The name of your branch is ${{ github.ref }} and your repository is ${{ github.repository }}."
+      - name: Check out repository code
+        uses: actions/checkout@v3
+      - name: Clone Repository Info
+        run: echo "💡 The ${{ github.repository }} repository has been cloned to the runner."
+      - name: Prepare to Test Code
+        run: echo "🖥️ The workflow is now ready to test your code on the runner."
+      - name: List files in the repository
+        run: ls ${{ github.workspace }}
+      - name: Display Job Status
+        run: echo "🍏 This job's status is ${{ job.status }}."
 
-    # Convert to Deploy Source
-    - name: Convert to Deploy Source
-      run: sfdx force:source:convert -r ./force-app -d ./toDeploy
-    
-    # Run Validation of Deploy Source
-    - name: Run Validation on Deploy Source
-      run: sfdx force:mdapi:deploy -l RunLocalTests -c -d ./toDeploy -u prod -w 10
-    
-    # Deploy
-    - name : Deploy to SF Org
-      run: sfdx force:mdapi:deploy -l RunLocalTests -d ./toDeploy -u prod -w 10
+  build:
+    runs-on: ubuntu-latest
+    environment: dev
+    steps:
+      - name: Checkout the Source code from the latest commit
+        uses: actions/checkout@v3
+      - name: Install NPM
+        run: npm install
+      - name: Install the SFDX CLI
+        run: |
+          npm install sfdx-cli --global
+          sfdx force --help
+      - name: Install the sfdx-git-delta plugin
+        run: echo 'y' | sfdx plugins:install sfdx-git-delta
+      - name: Authorize SF Org
+        env:
+          CLIENT_ID: ${{ secrets.SALESFORCEPRODCLIENTID }}
+          USERNAME: ${{ secrets.SALESFORCEPRODUSERNAME }}
+          INSTANCE_URL: ${{ secrets.SALESFORCEPRODINSTANCEURL }}
+        run: sfdx force:auth:jwt:grant --clientid $CLIENT_ID --jwtkeyfile ./assets/server.key --username $USERNAME --instanceurl $INSTANCE_URL -a prod
+      - name: Generate the package.xml for delta files
+        run: |
+          mkdir delta
+          sfdx sgd:source:delta --to "HEAD" --from "HEAD~1" --output "./delta" --ignore-whitespace -d -i .sgdignore
+          echo "--- package.xml generated with added and modified metadata ---"
+          cat delta/package/package.xml
+      - name: Deploy Delta components to Salesforce
+        run: sfdx force:source:deploy -x delta/package/package.xml -c -l RunLocalTests -u HubOrg
