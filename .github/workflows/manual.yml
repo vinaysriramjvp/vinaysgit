@@ -90,4 +90,3 @@ jobs:
 
           echo "Deployment Status: $deploymentStatus"
           echo "Deployment complete."
-        displayName: "Step: Validate and Deploy Salesforce Project"
