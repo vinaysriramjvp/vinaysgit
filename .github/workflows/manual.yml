@@ -51,9 +51,9 @@ jobs:
        # Authorize SF Org
       - name: Authorize SF Org
         env:
-           CLIENT_ID: ${{ secrets.SALESFORCEPRODCLIENTID }}
-           USERNAME: ${{ secrets.SALESFORCEPRODUSERNAME }}
-           INSTANCE_URL: ${{ secrets.SALESFORCEPRODINSTANCEURL }}
+           CLIENT_ID: ${{ dev.SALESFORCEPRODCLIENTID }}
+           USERNAME: ${{ dev.SALESFORCEPRODUSERNAME }}
+           INSTANCE_URL: ${{ dev.SALESFORCEPRODINSTANCEURL }}
       - name: Authenticate Salesforce ORG
         run: |
            run: sfdx force:auth:jwt:grant --clientid $CLIENT_ID --jwtkeyfile ./assets/server.key --username $USERNAME --instanceurl $INSTANCE_URL -a prod
