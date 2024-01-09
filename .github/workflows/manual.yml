@@ -19,7 +19,7 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@v2
         with:
-          node-version: '14' # Specify the Node.js version
+          node-version: '16' # Update Node.js to version 16
 
       - name: Install Salesforce CLI
         run: |
@@ -35,7 +35,7 @@ jobs:
           # Authenticate with the Salesforce Dev Org using JWT
           echo "Authenticating with Salesforce..."
           sf login org jwt --username $USERNAME --client-id $CLIENT_ID --jwt-key-file ./assets/server.key --instance-url $INSTANCE_URL
-
+          
       - name: Validate and Deploy Salesforce Project
         run: |
           # Validate the Salesforce project using the manifest/package.xml
