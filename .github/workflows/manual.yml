@@ -1,5 +1,8 @@
 name: Production Pipeline
 on:
+  push:
+    branches:
+      - dev
   pull_request:
     types: [closed]
     branches:
